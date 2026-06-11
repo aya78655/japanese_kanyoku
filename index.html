@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>慣用句クイズ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Helvetica Neue', Arial, 'Hiragino Sans', 'Meiryo', sans-serif;
+      background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .container {
+      background: #fff;
+      border-radius: 20px;
+      padding: 32px 28px;
+      max-width: 580px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+
+    h1 { text-align: center; font-size: 1.5rem; color: #1a6b4a; margin-bottom: 4px; }
+    .subtitle { text-align: center; font-size: 0.85rem; color: #888; margin-bottom: 24px; }
+
+    /* Progress */
+    .progress-bar-wrap { background: #eee; border-radius: 10px; height: 8px; margin-bottom: 8px; }
+    .progress-bar-fill {
+      background: linear-gradient(90deg, #43e97b, #38f9d7);
+      height: 100%; border-radius: 10px; transition: width 0.4s ease;
+    }
+    .progress-text { text-align: right; font-size: 0.8rem; color: #888; margin-bottom: 20px; }
+
+    /* Question card */
+    .question-card {
+      background: #f0fdf8;
+      border-radius: 14px;
+      padding: 24px 20px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .question-label { font-size: 0.8rem; color: #888; margin-bottom: 8px; letter-spacing: 0.05em; }
+    .question-word { font-size: 1.9rem; font-weight: bold; color: #1a6b4a; margin-bottom: 6px; line-height: 1.3; }
+    .question-reading { font-size: 0.9rem; color: #888; }
+
+    /* Hint */
+    .hint-btn {
+      background: none; border: 1.5px dashed #aaa; color: #888;
+      border-radius: 8px; padding: 6px 16px; font-size: 0.82rem;
+      cursor: pointer; margin: 14px 0 10px; transition: all 0.2s;
+    }
+    .hint-btn:hover { border-color: #43e97b; color: #1a6b4a; }
+    .hint-area {
+      font-size: 0.88rem; color: #1a6b4a; background: #e8fdf4;
+      border-radius: 8px; padding: 10px 14px; margin-bottom: 14px;
+      display: none; line-height: 1.6; text-align: left;
+    }
+    .hint-area.visible { display: block; }
+
+    /* Choices */
+    .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    .choice-btn {
+      background: #fff; border: 2px solid #ddd; border-radius: 12px;
+      padding: 12px 10px; font-size: 0.88rem; cursor: pointer;
+      transition: all 0.2s; color: #333; text-align: center; line-height: 1.5;
+    }
+    .choice-btn:hover:not(:disabled) {
+      border-color: #43e97b; background: #f0fdf8; transform: translateY(-2px);
+    }
+    .choice-btn.correct { border-color: #22c55e; background: #f0fdf4; color: #15803d; font-weight: bold; }
+    .choice-btn.wrong   { border-color: #ef4444; background: #fef2f2; color: #b91c1c; }
+
+    /* Feedback */
+    .feedback {
+      text-align: center; font-size: 1rem; font-weight: bold;
+      min-height: 40px; margin-bottom: 12px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 10px; padding: 10px;
+    }
+    .feedback.correct-fb { background: #f0fdf4; color: #15803d; }
+    .feedback.wrong-fb   { background: #fef2f2; color: #b91c1c; }
+
+    /* Answer reveal */
+    .answer-reveal {
+      font-size: 0.88rem; color: #555; background: #f0fdf8;
+      border-radius: 8px; padding: 12px 14px; margin-bottom: 16px;
+      display: none; line-height: 1.7;
+    }
+    .answer-reveal.visible { display: block; }
+    .answer-reveal strong { color: #1a6b4a; }
+
+    /* Next */
+    .next-btn {
+      display: none; width: 100%;
+      background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+      color: #fff; border: none; border-radius: 12px;
+      padding: 14px; font-size: 1rem; font-weight: bold;
+      cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+    }
+    .next-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    /* Score */
+    .score-screen { text-align: center; display: none; }
+    .score-emoji { font-size: 4rem; margin-bottom: 12px; }
+    .score-num { font-size: 2.5rem; font-weight: bold; color: #1a6b4a; margin-bottom: 8px; }
+    .score-msg { font-size: 1rem; color: #555; margin-bottom: 20px; line-height: 1.6; }
+    .score-breakdown {
+      font-size: 0.82rem; color: #666; background: #f0fdf8;
+      border-radius: 10px; padding: 14px; text-align: left;
+      margin-bottom: 24px; line-height: 2;
+      max-height: 240px; overflow-y: auto;
+    }
+    .score-breakdown .wrong-row { color: #b91c1c; }
+    .restart-btn {
+      background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+      color: #fff; border: none; border-radius: 12px;
+      padding: 14px 32px; font-size: 1rem; font-weight: bold; cursor: pointer;
+    }
+    .restart-btn:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>💬 慣用句クイズ</h1>
+  <p class="subtitle">慣用句の意味を選ぼう！</p>
+
+  <div id="quizBody">
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progressBar"></div>
+    </div>
+    <div class="progress-text" id="progressText"></div>
+
+    <div class="question-card">
+      <div class="question-label">この慣用句の意味は？</div>
+      <div class="question-word" id="qWord"></div>
+      <div class="question-reading" id="qReading"></div>
+    </div>
+
+    <div style="text-align:center;">
+      <button class="hint-btn" id="hintBtn" onclick="showHint()">💡 ヒントを見る</button>
+    </div>
+    <div class="hint-area" id="hintArea"></div>
+
+    <div class="choices" id="choices"></div>
+
+    <div class="feedback" id="feedback"></div>
+    <div class="answer-reveal" id="answerReveal"></div>
+
+    <button class="next-btn" id="nextBtn" onclick="nextQuestion()">次の問題へ →</button>
+  </div>
+
+  <div class="score-screen" id="scoreScreen">
+    <div class="score-emoji" id="scoreEmoji"></div>
+    <div class="score-num" id="scoreNum"></div>
+    <div class="score-msg" id="scoreMsg"></div>
+    <div class="score-breakdown" id="scoreBreakdown"></div>
+    <button class="restart-btn" onclick="restartQuiz()">もう一度やる 🔄</button>
+  </div>
+</div>
+
+<script>
+const idioms = [
+  // シート1
+  { word: '箔が付く',       reading: 'はくがつく',         meaning: '経験などにより、値打ちや品格が加わる。',             hint: '価値や格が上がること' },
+  { word: '旗色が悪い',     reading: 'はたいろがわるい',   meaning: '形勢が不利である。勝ち目がない。',                   hint: '状況が有利ではない' },
+  { word: '畑違い',         reading: 'はたけちがい',       meaning: '専門外であること。自分の得意分野と違う。',           hint: '専門・分野が異なる' },
+  { word: '白羽の矢が立つ', reading: 'しらはのやがたつ',   meaning: '多くの中から特に選び出される。',                     hint: '大勢の中から選ばれる' },
+  { word: '羽振りがよい',   reading: 'はぶりがよい',       meaning: '権勢や財力があって、勢いが盛んである。',             hint: 'お金や権力がある' },
+  { word: '羽目を外す',     reading: 'はめをはずす',       meaning: '調子に乗って度を越した行動をする。',                 hint: 'はしゃぎすぎる' },
+  { word: '火に油をそそぐ', reading: 'ひにあぶらをそそぐ', meaning: '勢いのあるものをさらに激しくさせる。',               hint: 'さらに激しくなる' },
+  { word: '火の消えたよう', reading: 'ひのきえたよう',     meaning: '急に活気がなくなり、ひっそりとした様子。',           hint: '急に静かになった様子' },
+  { word: '火の車',         reading: 'ひのくるま',         meaning: '家計や財政が非常に苦しい状態。',                     hint: 'お金がとても苦しい' },
+  { word: '火花を散らす',   reading: 'ひばなをちらす',     meaning: '激しく競い合う。激しく争う。',                       hint: '激しく競い合うこと' },
+  // シート2
+  { word: '釘をさす',           reading: 'くぎをさす',             meaning: '後で問題が起きないよう、念を押す。',                 hint: 'あらかじめ注意する' },
+  { word: '口火を切る',         reading: 'くちびをきる',           meaning: '物事を最初に始める。最初に口を開く。',               hint: '最初に始める' },
+  { word: 'さじを投げる',       reading: 'さじをなげる',           meaning: 'もう手の施しようがないとあきらめる。',               hint: 'あきらめること' },
+  { word: 'しのぎを削る',       reading: 'しのぎをけずる',         meaning: '激しく競争する。',                                   hint: '激しく争う' },
+  { word: '棚に上げる',         reading: 'たなにあげる',           meaning: '自分に都合の悪いことを無視する。',                   hint: '問題を放置・無視する' },
+  { word: '玉にきず',           reading: 'たまにきず',             meaning: 'ほぼ完全なものにわずかな欠点があること。',           hint: 'ほぼ完璧だが少し欠点がある' },
+  { word: '手塩にかける',       reading: 'てしおにかける',         meaning: '自分で直接世話をして大切に育てる。',                 hint: '大切に育てる' },
+  { word: '峠を越す',           reading: 'とうげをこす',           meaning: '最も苦しい・危険な状態を乗り越える。',               hint: '山場を乗り越える' },
+  { word: '二足のわらじをはく', reading: 'にそくのわらじをはく',   meaning: '相反する二つの仕事・立場を兼ねる。',                 hint: '二つの役割を同時にこなす' },
+  { word: '乗りかかった船',     reading: 'のりかかったふね',       meaning: '途中まで関わった以上、最後までやるしかない。',       hint: '途中でやめられない' },
+  // シート3
+  { word: '水に流す',     reading: 'みずにながす',     meaning: '過去のことをなかったことにする。',           hint: '過去を忘れる・許す' },
+  { word: '水の泡',       reading: 'みずのあわ',       meaning: '努力や苦労がすべて無駄になること。',         hint: '苦労がすべて無駄になる' },
+  { word: '水を打ったよう', reading: 'みずをうったよう', meaning: '大勢の人が静まりかえった様子。',             hint: 'しんと静まりかえった状態' },
+  { word: '水を差す',     reading: 'みずをさす',       meaning: 'うまくいっていることの邪魔をする。',         hint: 'じゃまをする' },
+  { word: '横車を押す',   reading: 'よこぐるまをおす', meaning: '道理に合わないことを無理に押し通す。',       hint: '無理を通す' },
+  // シート4
+  { word: '火ぶたを切る', reading: 'ひぶたをきる',     meaning: '戦い・争い・競争などを始める。',             hint: '始まりの合図' },
+  { word: '筆が立つ',     reading: 'ふでがたつ',       meaning: '文章を書くのが上手である。',                 hint: '文章力がある' },
+  { word: '筆を入れる',   reading: 'ふでをいれる',     meaning: '文章や絵などを加筆・修正する。',             hint: '手を加えて直す' },
+  { word: '舟を漕ぐ',     reading: 'ふねをこぐ',       meaning: '座ったままうとうとする。',                   hint: 'うとうとする' },
+  { word: '棒に振る',     reading: 'ぼうにふる',       meaning: 'それまでの努力や積み重ねを無駄にする。',     hint: '今までの努力をむだにする' },
+  { word: '幕が開く',     reading: 'まくがあく',       meaning: '物事が始まる。',                             hint: '始まること' },
+  { word: '幕が下りる',   reading: 'まくがおりる',     meaning: '物事が終わる。',                             hint: '終わること' },
+  { word: '的を射る',     reading: 'まとをいる',       meaning: '要点を的確につかむ。',                       hint: '核心をつく' },
+  { word: '水入らず',     reading: 'みずいらず',       meaning: '身内だけで他人が入らないこと。',             hint: '家族・仲間だけの' },
+  { word: '水と油',       reading: 'みずとあぶら',     meaning: '性質が正反対で互いにうまく調和しないこと。', hint: '相性がまったく合わない' },
+  // シート5
+  { word: '油を売る',         reading: 'あぶらをうる',       meaning: '仕事をさぼって、むだ話などをして時間を過ごす。', hint: 'なまける・さぼる' },
+  { word: '油をしぼる',       reading: 'あぶらをしぼる',     meaning: '厳しく叱る・注意する。',                         hint: '厳しく怒る' },
+  { word: '泡を食う',         reading: 'あわをくう',         meaning: '非常に驚いてあわてふためく。',                   hint: '大慌てする' },
+  { word: '板につく',         reading: 'いたにつく',         meaning: '経験を積んで、その職業・地位にふさわしくなる。', hint: '慣れてさまになる' },
+  { word: '襟を正す',         reading: 'えりをただす',       meaning: '改めて真剣な態度になる。',                       hint: '気を引き締める' },
+  { word: '大船に乗ったよう', reading: 'おおぶねにのったよう', meaning: '頼もしい人に任せて安心していること。',             hint: '安心している状態' },
+  { word: 'お茶をにごす',     reading: 'おちゃをにごす',     meaning: 'その場をごまかして、うまくとりつくろう。',         hint: 'ごまかす・その場をしのぐ' },
+  { word: '折り紙をつける',   reading: 'おりがみをつける',   meaning: '確かな保証をする。品質・実力を保証する。',         hint: '太鼓判を押す' },
+  { word: '片棒を担ぐ',       reading: 'かたぼうをかつぐ',   meaning: '悪事などに加担する。',                           hint: '悪いことに手を貸す' },
+  { word: 'かぶとをぬぐ',     reading: 'かぶとをぬぐ',       meaning: '相手の実力を認めて降参する。',                   hint: '負けを認める' },
+];
+
+let questions = [], current = 0, score = 0, results = [], answered = false;
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildQuestions() {
+  return shuffle([...idioms]).slice(0, 15);
+}
+
+function getWrongMeanings(correctWord, count) {
+  const pool = idioms.filter(id => id.word !== correctWord);
+  return shuffle(pool).slice(0, count);
+}
+
+function renderQuestion() {
+  answered = false;
+  const q = questions[current];
+  const total = questions.length;
+
+  document.getElementById('progressBar').style.width = ((current / total) * 100) + '%';
+  document.getElementById('progressText').textContent = `${current + 1} / ${total} 問`;
+
+  document.getElementById('qWord').textContent = q.word;
+  document.getElementById('qReading').textContent = `（${q.reading}）`;
+
+  // ヒント（デフォルト非表示）
+  const hintArea = document.getElementById('hintArea');
+  hintArea.textContent = `ヒント：${q.hint}`;
+  hintArea.classList.remove('visible');
+  document.getElementById('hintBtn').style.display = '';
+
+  // 選択肢：正解＋不正解3つ（意味のテキストで選ぶ）
+  const wrongs = getWrongMeanings(q.word, 3);
+  const choices = shuffle([
+    { meaning: q.meaning, isCorrect: true },
+    ...wrongs.map(w => ({ meaning: w.meaning, isCorrect: false }))
+  ]);
+
+  const choicesEl = document.getElementById('choices');
+  choicesEl.innerHTML = '';
+  for (const ch of choices) {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = ch.meaning;
+    btn.onclick = () => checkAnswer(ch.isCorrect, btn, q);
+    choicesEl.appendChild(btn);
+  }
+
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('feedback').className = 'feedback';
+  document.getElementById('answerReveal').classList.remove('visible');
+  document.getElementById('nextBtn').style.display = 'none';
+}
+
+function showHint() {
+  document.getElementById('hintArea').classList.add('visible');
+  document.getElementById('hintBtn').style.display = 'none';
+}
+
+function checkAnswer(isCorrect, btn, q) {
+  if (answered) return;
+  answered = true;
+
+  document.querySelectorAll('.choice-btn').forEach(b => b.disabled = true);
+
+  const feedback = document.getElementById('feedback');
+  const reveal = document.getElementById('answerReveal');
+
+  if (isCorrect) {
+    score++;
+    btn.classList.add('correct');
+    feedback.textContent = '⭕ 正解！すばらしい！';
+    feedback.className = 'feedback correct-fb';
+    results.push(true);
+  } else {
+    btn.classList.add('wrong');
+    // 正解ボタンをハイライト
+    document.querySelectorAll('.choice-btn').forEach(b => {
+      if (b.textContent === q.meaning) b.classList.add('correct');
+    });
+    feedback.textContent = '❌ 不正解…';
+    feedback.className = 'feedback wrong-fb';
+    results.push(false);
+  }
+
+  reveal.innerHTML = `<strong>「${q.word}」（${q.reading}）</strong><br>${q.meaning}`;
+  reveal.classList.add('visible');
+
+  const nextBtn = document.getElementById('nextBtn');
+  nextBtn.style.display = 'block';
+  nextBtn.textContent = current + 1 < questions.length ? '次の問題へ →' : '結果を見る 🎉';
+  document.getElementById('hintBtn').style.display = 'none';
+}
+
+function nextQuestion() {
+  current++;
+  if (current >= questions.length) showScore();
+  else renderQuestion();
+}
+
+function showScore() {
+  document.getElementById('quizBody').style.display = 'none';
+  const screen = document.getElementById('scoreScreen');
+  screen.style.display = 'block';
+
+  const total = questions.length;
+  const pct = Math.round((score / total) * 100);
+
+  let emoji, msg;
+  if (pct === 100)    { emoji = '🏆'; msg = '全問正解！完璧です！素晴らしい語彙力ですね！'; }
+  else if (pct >= 80) { emoji = '🌟'; msg = `${pct}点！よくできました！あと少しで満点です。`; }
+  else if (pct >= 60) { emoji = '👍'; msg = `${pct}点！なかなか良いです。もう一度挑戦してみよう！`; }
+  else if (pct >= 40) { emoji = '📖'; msg = `${pct}点。意味を確認してもう一度チャレンジ！`; }
+  else                { emoji = '💪'; msg = `${pct}点。難しかったですね。復習してまた挑戦しよう！`; }
+
+  document.getElementById('scoreEmoji').textContent = emoji;
+  document.getElementById('scoreNum').textContent = `${score} / ${total} 問正解（${pct}点）`;
+  document.getElementById('scoreMsg').textContent = msg;
+
+  const bd = document.getElementById('scoreBreakdown');
+  bd.innerHTML = results.map((r, i) => {
+    const q = questions[i];
+    const mark = r ? '⭕' : '❌';
+    const cls = r ? '' : 'wrong-row';
+    return `<div class="${cls}">${mark} ${q.word}　→　${q.meaning}</div>`;
+  }).join('');
+}
+
+function restartQuiz() {
+  score = 0; current = 0; results = [];
+  questions = buildQuestions();
+  document.getElementById('scoreScreen').style.display = 'none';
+  document.getElementById('quizBody').style.display = 'block';
+  renderQuestion();
+}
+
+questions = buildQuestions();
+renderQuestion();
+</script>
+</body>
+</html>
