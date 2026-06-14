@@ -25,6 +25,11 @@
     .question-label { font-size: 0.8rem; color: #888; margin-bottom: 8px; letter-spacing: 0.05em; }
     .question-word { font-size: 1.9rem; font-weight: bold; color: #1a6b4a; margin-bottom: 6px; line-height: 1.3; }
     .question-reading { font-size: 0.9rem; color: #888; }
+    .retry-badge {
+      display: inline-block; background: #fef2f2; color: #b91c1c;
+      border: 1px solid #fca5a5; border-radius: 20px;
+      font-size: 0.75rem; font-weight: bold; padding: 3px 12px; margin-top: 8px;
+    }
     .hint-btn {
       background: none; border: 1.5px dashed #aaa; color: #888;
       border-radius: 8px; padding: 6px 16px; font-size: 0.82rem;
@@ -69,6 +74,8 @@
       cursor: pointer; transition: opacity 0.2s, transform 0.1s;
     }
     .next-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    /* Score screen */
     .score-screen { text-align: center; display: none; }
     .score-emoji { font-size: 4rem; margin-bottom: 12px; }
     .score-num { font-size: 2.5rem; font-weight: bold; color: #1a6b4a; margin-bottom: 8px; }
@@ -76,21 +83,39 @@
     .score-breakdown {
       font-size: 0.82rem; color: #666; background: #f0fdf8;
       border-radius: 10px; padding: 14px; text-align: left;
-      margin-bottom: 24px; line-height: 2; max-height: 240px; overflow-y: auto;
+      margin-bottom: 20px; line-height: 2; max-height: 240px; overflow-y: auto;
     }
     .score-breakdown .wrong-row { color: #b91c1c; }
+    .btn-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
     .restart-btn {
       background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
       color: #fff; border: none; border-radius: 12px;
-      padding: 14px 32px; font-size: 1rem; font-weight: bold; cursor: pointer;
+      padding: 14px 24px; font-size: 0.95rem; font-weight: bold; cursor: pointer;
+      transition: opacity 0.2s;
     }
     .restart-btn:hover { opacity: 0.9; }
+    .retry-wrong-btn {
+      background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+      color: #fff; border: none; border-radius: 12px;
+      padding: 14px 24px; font-size: 0.95rem; font-weight: bold; cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .retry-wrong-btn:hover { opacity: 0.9; }
+    .retry-wrong-btn:disabled { opacity: 0.4; cursor: default; }
+
+    /* Perfect screen */
+    .perfect-msg {
+      background: #f0fdf4; border: 2px solid #86efac; border-radius: 12px;
+      padding: 16px; color: #15803d; font-size: 0.95rem;
+      margin-bottom: 20px; font-weight: bold;
+    }
   </style>
 </head>
 <body>
 <div class="container">
   <h1>💬 慣用句クイズ</h1>
-  <p class="subtitle">慣用句の意味を選ぼう！</p>
+  <p class="subtitle" id="mainSubtitle">慣用句の意味を選ぼう！</p>
+
   <div id="quizBody">
     <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressBar"></div></div>
     <div class="progress-text" id="progressText"></div>
@@ -98,6 +123,7 @@
       <div class="question-label">この慣用句の意味は？</div>
       <div class="question-word" id="qWord"></div>
       <div class="question-reading" id="qReading"></div>
+      <div id="retryBadge"></div>
     </div>
     <div style="text-align:center;">
       <button class="hint-btn" id="hintBtn" onclick="showHint()">💡 ヒントを見る</button>
@@ -108,16 +134,22 @@
     <div class="answer-reveal" id="answerReveal"></div>
     <button class="next-btn" id="nextBtn" onclick="nextQuestion()">次の問題へ →</button>
   </div>
+
   <div class="score-screen" id="scoreScreen">
     <div class="score-emoji" id="scoreEmoji"></div>
     <div class="score-num" id="scoreNum"></div>
     <div class="score-msg" id="scoreMsg"></div>
+    <div id="perfectMsg" class="perfect-msg" style="display:none;">🎉 まちがいなし！全問正解です！</div>
     <div class="score-breakdown" id="scoreBreakdown"></div>
-    <button class="restart-btn" onclick="restartQuiz()">もう一度やる 🔄</button>
+    <div class="btn-row">
+      <button class="retry-wrong-btn" id="retryWrongBtn" onclick="retryWrong()">❌ まちがえた問題を復習</button>
+      <button class="restart-btn" onclick="restartQuiz()">🔄 全問もう一度</button>
+    </div>
   </div>
 </div>
+
 <script>
-const idioms = [
+var idioms = [
   { word: '箔が付く',       reading: 'はくがつく',           meaning: '経験などにより、値打ちや品格が加わる。',             hint: '価値や格が上がること' },
   { word: '旗色が悪い',     reading: 'はたいろがわるい',     meaning: '形勢が不利である。勝ち目がない。',                   hint: '状況が有利ではない' },
   { word: '畑違い',         reading: 'はたけちがい',         meaning: '専門外であること。自分の得意分野と違う。',           hint: '専門・分野が異なる' },
@@ -162,54 +194,68 @@ const idioms = [
   { word: 'お茶をにごす',     reading: 'おちゃをにごす',       meaning: 'その場をごまかして、うまくとりつくろう。',         hint: 'ごまかす・その場をしのぐ' },
   { word: '折り紙をつける',   reading: 'おりがみをつける',     meaning: '確かな保証をする。品質・実力を保証する。',         hint: '太鼓判を押す' },
   { word: '片棒を担ぐ',       reading: 'かたぼうをかつぐ',     meaning: '悪事などに加担する。',                           hint: '悪いことに手を貸す' },
-  { word: 'かぶとをぬぐ',     reading: 'かぶとをぬぐ',         meaning: '相手の実力を認めて降参する。',                   hint: '負けを認める' },
+  { word: 'かぶとをぬぐ',     reading: 'かぶとをぬぐ',         meaning: '相手の実力を認めて降参する。',                   hint: '負けを認める' }
 ];
 
-let questions = [], current = 0, score = 0, results = [], answered = false;
+var questions = [];
+var current = 0;
+var score = 0;
+var results = [];
+var answered = false;
+var isRetryMode = false;
 
 function shuffle(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
+  var a = arr.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
   }
   return a;
 }
 
-function buildQuestions() { return shuffle([...idioms]); }
+function buildQuestions(pool) {
+  return shuffle(pool || idioms.slice());
+}
 
 function getWrongMeanings(correctWord, count) {
-  return shuffle(idioms.filter(id => id.word !== correctWord)).slice(0, count);
+  return shuffle(idioms.filter(function(id) { return id.word !== correctWord; })).slice(0, count);
 }
 
 function renderQuestion() {
   answered = false;
-  const q = questions[current];
-  const total = questions.length;
+  var q = questions[current];
+  var total = questions.length;
 
   document.getElementById('progressBar').style.width = ((current / total) * 100) + '%';
   document.getElementById('progressText').textContent = (current + 1) + ' / ' + total + ' 問';
   document.getElementById('qWord').textContent = q.word;
   document.getElementById('qReading').textContent = '（' + q.reading + '）';
 
-  const hintArea = document.getElementById('hintArea');
+  var badge = document.getElementById('retryBadge');
+  badge.innerHTML = isRetryMode ? '<span class="retry-badge">❌ まちがえた問題</span>' : '';
+
+  var hintArea = document.getElementById('hintArea');
   hintArea.textContent = 'ヒント：' + q.hint;
   hintArea.classList.remove('visible');
   document.getElementById('hintBtn').style.display = '';
 
-  const wrongs = getWrongMeanings(q.word, 3);
-  const choices = shuffle([
+  var wrongs = getWrongMeanings(q.word, 3);
+  var choices = shuffle([
     { meaning: q.meaning, isCorrect: true },
-    ...wrongs.map(w => ({ meaning: w.meaning, isCorrect: false }))
+    { meaning: wrongs[0].meaning, isCorrect: false },
+    { meaning: wrongs[1].meaning, isCorrect: false },
+    { meaning: wrongs[2].meaning, isCorrect: false }
   ]);
 
-  const choicesEl = document.getElementById('choices');
+  var choicesEl = document.getElementById('choices');
   choicesEl.innerHTML = '';
-  choices.forEach(ch => {
-    const btn = document.createElement('button');
+  choices.forEach(function(ch) {
+    var btn = document.createElement('button');
     btn.className = 'choice-btn';
     btn.textContent = ch.meaning;
-    btn.onclick = () => checkAnswer(ch.isCorrect, btn, q);
+    btn.onclick = (function(c) {
+      return function() { checkAnswer(c.isCorrect, btn, q); };
+    })(ch);
     choicesEl.appendChild(btn);
   });
 
@@ -227,49 +273,56 @@ function showHint() {
 function checkAnswer(isCorrect, btn, q) {
   if (answered) return;
   answered = true;
-  document.querySelectorAll('.choice-btn').forEach(b => b.disabled = true);
 
-  const feedback = document.getElementById('feedback');
-  const reveal = document.getElementById('answerReveal');
+  var allBtns = document.querySelectorAll('.choice-btn');
+  for (var i = 0; i < allBtns.length; i++) { allBtns[i].disabled = true; }
+
+  var feedback = document.getElementById('feedback');
+  var reveal = document.getElementById('answerReveal');
 
   if (isCorrect) {
     score++;
     btn.classList.add('correct');
     feedback.textContent = '⭕ 正解！すばらしい！';
     feedback.className = 'feedback correct-fb';
-    results.push(true);
+    results.push(false);  // false = not wrong
   } else {
     btn.classList.add('wrong');
-    document.querySelectorAll('.choice-btn').forEach(b => {
-      if (b.textContent === q.meaning) b.classList.add('correct');
-    });
+    var allBtns2 = document.querySelectorAll('.choice-btn');
+    for (var j = 0; j < allBtns2.length; j++) {
+      if (allBtns2[j].textContent === q.meaning) allBtns2[j].classList.add('correct');
+    }
     feedback.textContent = '❌ 不正解…';
     feedback.className = 'feedback wrong-fb';
-    results.push(false);
+    results.push(true);  // true = wrong
   }
 
   reveal.innerHTML = '<strong>「' + q.word + '」（' + q.reading + '）</strong><br>' + q.meaning;
   reveal.classList.add('visible');
 
-  const nextBtn = document.getElementById('nextBtn');
+  var nextBtn = document.getElementById('nextBtn');
   nextBtn.style.display = 'block';
-  nextBtn.textContent = current + 1 < questions.length ? '次の問題へ →' : '結果を見る 🎉';
+  nextBtn.textContent = (current + 1 < questions.length) ? '次の問題へ →' : '結果を見る 🎉';
   document.getElementById('hintBtn').style.display = 'none';
 }
 
 function nextQuestion() {
   current++;
-  if (current >= questions.length) showScore();
-  else renderQuestion();
+  if (current >= questions.length) {
+    showScore();
+  } else {
+    renderQuestion();
+  }
 }
 
 function showScore() {
   document.getElementById('quizBody').style.display = 'none';
   document.getElementById('scoreScreen').style.display = 'block';
 
-  const total = questions.length;
-  const pct = Math.round((score / total) * 100);
-  let emoji, msg;
+  var total = questions.length;
+  var pct = Math.round((score / total) * 100);
+
+  var emoji, msg;
   if (pct === 100)    { emoji = '🏆'; msg = '全問正解！完璧です！素晴らしい語彙力ですね！'; }
   else if (pct >= 80) { emoji = '🌟'; msg = pct + '点！よくできました！あと少しで満点です。'; }
   else if (pct >= 60) { emoji = '👍'; msg = pct + '点！なかなか良いです。もう一度挑戦してみよう！'; }
@@ -280,23 +333,67 @@ function showScore() {
   document.getElementById('scoreNum').textContent = score + ' / ' + total + ' 問正解（' + pct + '点）';
   document.getElementById('scoreMsg').textContent = msg;
 
-  const bd = document.getElementById('scoreBreakdown');
-  bd.innerHTML = results.map((r, i) => {
-    const q = questions[i];
-    const mark = r ? '⭕' : '❌';
-    const cls = r ? '' : 'wrong-row';
-    return '<div class="' + cls + '">' + mark + ' ' + q.word + '　→　' + q.meaning + '</div>';
-  }).join('');
+  // Count wrong answers
+  var wrongCount = 0;
+  for (var i = 0; i < results.length; i++) { if (results[i]) wrongCount++; }
+
+  // Show/hide perfect message and retry button
+  var perfectMsg = document.getElementById('perfectMsg');
+  var retryBtn = document.getElementById('retryWrongBtn');
+  if (wrongCount === 0) {
+    perfectMsg.style.display = 'block';
+    retryBtn.disabled = true;
+  } else {
+    perfectMsg.style.display = 'none';
+    retryBtn.disabled = false;
+    retryBtn.textContent = '❌ まちがえた ' + wrongCount + ' 問を復習';
+  }
+
+  // Build breakdown list
+  var html = '';
+  for (var i = 0; i < results.length; i++) {
+    var q = questions[i];
+    var isWrong = results[i];
+    var mark = isWrong ? '❌' : '⭕';
+    var cls = isWrong ? 'wrong-row' : '';
+    html += '<div class="' + cls + '">' + mark + ' ' + q.word + '　→　' + q.meaning + '</div>';
+  }
+  document.getElementById('scoreBreakdown').innerHTML = html;
+}
+
+function retryWrong() {
+  // Collect wrong questions
+  var wrongQuestions = [];
+  for (var i = 0; i < results.length; i++) {
+    if (results[i]) wrongQuestions.push(questions[i]);
+  }
+  if (wrongQuestions.length === 0) return;
+
+  isRetryMode = true;
+  document.getElementById('mainSubtitle').textContent = '❌ まちがえた問題だけ復習しよう！';
+  questions = shuffle(wrongQuestions);
+  current = 0;
+  score = 0;
+  results = [];
+
+  document.getElementById('scoreScreen').style.display = 'none';
+  document.getElementById('quizBody').style.display = 'block';
+  renderQuestion();
 }
 
 function restartQuiz() {
-  score = 0; current = 0; results = [];
+  isRetryMode = false;
+  document.getElementById('mainSubtitle').textContent = '慣用句の意味を選ぼう！';
+  score = 0;
+  current = 0;
+  results = [];
   questions = buildQuestions();
   document.getElementById('scoreScreen').style.display = 'none';
   document.getElementById('quizBody').style.display = 'block';
   renderQuestion();
 }
 
+// Init
 questions = buildQuestions();
 renderQuestion();
 </script>
